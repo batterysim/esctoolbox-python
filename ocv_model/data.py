@@ -15,22 +15,22 @@ import pandas as pd
 # files to read, values can be N05, N15, N25, P05, P15, P25, P35, or P45
 tc = 'N05'
 
-df1 = pd.read_csv('../a123_data/A123_OCV_' + tc + '_S1.csv')
+df1 = pd.read_csv('../ocv_data/A123_OCV_' + tc + '_S1.csv')
 test_time1 = df1['Test_Time(s)']
 current1 = df1['Current(A)']
 voltage1 = df1['Voltage(V)']
 
-df2 = pd.read_csv('../a123_data/A123_OCV_' + tc + '_S2.csv')
+df2 = pd.read_csv('../ocv_data/A123_OCV_' + tc + '_S2.csv')
 test_time2 = df2['Test_Time(s)']
 current2 = df2['Current(A)']
 voltage2 = df2['Voltage(V)']
 
-df3 = pd.read_csv('../a123_data/A123_OCV_' + tc + '_S3.csv')
+df3 = pd.read_csv('../ocv_data/A123_OCV_' + tc + '_S3.csv')
 test_time3 = df3['Test_Time(s)']
 current3 = df3['Current(A)']
 voltage3 = df3['Voltage(V)']
 
-df4 = pd.read_csv('../a123_data/A123_OCV_' + tc + '_S4.csv')
+df4 = pd.read_csv('../ocv_data/A123_OCV_' + tc + '_S4.csv')
 test_time4 = df4['Test_Time(s)']
 current4 = df4['Current(A)']
 voltage4 = df4['Voltage(V)']
