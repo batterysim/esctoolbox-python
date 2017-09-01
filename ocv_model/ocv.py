@@ -4,8 +4,9 @@ Python version of the runProcessOCV Matlab file for A123_OCV battery cell.
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 
-from models import BatteryScript, BatteryData, FileData, ModelOcv
+from models import BatteryData, FileData, ModelOcv
 from funcs import OCVfromSOCtemp
 
 # Parameters and Data
@@ -24,7 +25,7 @@ eta = np.zeros(len(temps))  # coulombic efficiency
 Q = np.zeros(len(temps))    # apparent total capacity
 
 # initialize array to store battery cell data
-data = np.zeros(len(temps), dtype=object)     
+data = np.zeros(len(temps), dtype=object)
 
 # load battery cell data for each temperature as objects then store in data array
 for idx, temp in enumerate(temps):
@@ -129,9 +130,9 @@ for k in not25:
     data[k].s4.chgAh = data[k].s4.chgAh * eta25
 
     # coulombic efficiency
-    eta[k] = ((data[k].s1.disAh[-1] + data[k].s2.disAh[-1] + data[k].s3.disAh[-1] 
-             + data[k].s4.disAh[-1] - data[k].s2.chgAh[-1] - data[k].s4.chgAh[-1]) 
-             / (data[k].s1.chgAh[-1] + data[k].s3.chgAh[-1]))
+    eta[k] = ((data[k].s1.disAh[-1] + data[k].s2.disAh[-1] + data[k].s3.disAh[-1]
+               + data[k].s4.disAh[-1] - data[k].s2.chgAh[-1] - data[k].s4.chgAh[-1])
+              / (data[k].s1.chgAh[-1] + data[k].s3.chgAh[-1]))
 
     # adjust charge Ah per eta at current temp
     data[k].s1.chgAh = data[k].s1.chgAh * eta[k]
@@ -224,7 +225,7 @@ z = np.arange(-0.1, 1.1, 0.01)     # test soc vector
 v = np.arange(minV-0.01, maxV+0.02, 0.01)
 socs = np.zeros((len(temps), len(v)))
 
-for k in range(len(temps)):
+for k, _ in enumerate(temps):
     T = temps[k]
     v1 = OCVfromSOCtemp(z, T, modelocv)
     socs[k, :] = np.interp(v, v1, z)
@@ -239,8 +240,9 @@ for k in range(len(v)):
     SOC0[k] = X[0][0]
     SOCrel[k] = X[0][1]
 
-# store ocv results in model object
+# store ocv results in model object then save to disk
 modelocv = ModelOcv(OCV0, OCVrel, SOC, v, SOC0, SOCrel, eta, Q)
+pickle.dump(modelocv, open('modelocv.pickle', 'wb'))
 
 # Plot Results
 # ------------------------------------------------------------------------------
@@ -248,45 +250,13 @@ modelocv = ModelOcv(OCV0, OCVrel, SOC, v, SOC0, SOCrel, eta, Q)
 plt.close('all')
 plt.ion()
 
-# k = 0   # index for -25 degC
-# err = filedata[k].rawocv - OCVfromSOCtemp(SOC, filedata[k].temp, modelocv)
-# rmserr = np.sqrt(np.mean(err**2))
-
-# plt.figure(1)
-# plt.plot(100*SOC, OCVfromSOCtemp(SOC, filedata[k].temp, modelocv), 'k')
-# plt.plot(100*SOC, filedata[k].rawocv, 'r')
-# plt.plot(100*filedata[k].disZ, filedata[k].disV, 'g--')
-# plt.plot(100*filedata[k].chgZ, filedata[k].chgV, 'b--')
-# plt.text(2, maxV-0.15, f'RMS error = {rmserr*1000:.01f} mV')
-# plt.ylim(minV-0.2, maxV+0.2)
-# plt.title('A123 OCV relationship at temp = -25')
-# plt.xlabel('SOC (%)')
-# plt.ylabel('OCV (V)')
-# plt.grid()
-
-# k = 5   # index for 25 degC
-# err = filedata[k].rawocv - OCVfromSOCtemp(SOC, filedata[k].temp, modelocv)
-# rmserr = np.sqrt(np.mean(err**2))
-
-# plt.figure(5)
-# plt.plot(100*SOC, OCVfromSOCtemp(SOC, filedata[k].temp, modelocv), 'k')
-# plt.plot(100*SOC,filedata[k].rawocv, 'r')
-# plt.plot(100*filedata[k].disZ, filedata[k].disV, 'g--')
-# plt.plot(100*filedata[k].chgZ, filedata[k].chgV, 'b--')
-# plt.text(2, maxV-0.15, f'RMS error = {rmserr*1000:.01f} mV')
-# plt.ylim(minV-0.2, maxV+0.2)
-# plt.title('A123 OCV relationship at temp = 25')
-# plt.xlabel('SOC (%)')
-# plt.ylabel('OCV (V)')
-# plt.grid()
-
-for k in range(len(temps)):
+for k, _ in enumerate(temps):
     err = filedata[k].rawocv - OCVfromSOCtemp(SOC, filedata[k].temp, modelocv)
     rmserr = np.sqrt(np.mean(err**2))
 
     plt.figure(k+1)
     plt.plot(100*SOC, OCVfromSOCtemp(SOC, filedata[k].temp, modelocv), 'k', label='model')
-    plt.plot(100*SOC,filedata[k].rawocv, 'r', label='approx')
+    plt.plot(100*SOC, filedata[k].rawocv, 'r', label='approx')
     plt.plot(100*filedata[k].disZ, filedata[k].disV, 'g--', label='dis')
     plt.plot(100*filedata[k].chgZ, filedata[k].chgV, 'b--', label='chg')
     plt.text(2, maxV-0.15, f'RMS error = {rmserr*1000:.01f} mV')
