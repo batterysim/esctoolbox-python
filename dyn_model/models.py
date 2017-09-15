@@ -45,3 +45,19 @@ class Script:
         self.disAh = disAh
 
 
+class ModelOcv:
+    """
+    Model representing OCV results.
+    """
+
+    def __init__(self, OCV0, OCVrel, SOC, OCV, SOC0, SOCrel, OCVeta, OCVQ):
+        self.OCV0 = OCV0
+        self.OCVrel = OCVrel
+        self.SOC = SOC
+        self.OCV = OCV
+        self.SOC0 = SOC0
+        self.SOCrel = SOCrel
+        self.OCVeta = OCVeta
+        self.OCVQ = OCVQ
+
+
