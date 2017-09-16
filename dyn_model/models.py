@@ -29,13 +29,13 @@ class Script:
         """
         Initialize with data from csv file.
         """
-        df = pd.read_csv(csvfile, sep=', ', engine='python')
+        df = pd.read_csv(csvfile)
         time = df['time'].values
-        step = df['step'].values
-        current = df['current'].values
-        voltage = df['voltage'].values
-        chgAh = df['chgAh'].values
-        disAh = df['disAh'].values
+        step = df[' step'].values
+        current = df[' current'].values
+        voltage = df[' voltage'].values
+        chgAh = df[' chgAh'].values
+        disAh = df[' disAh'].values
 
         self.time = time
         self.step = step

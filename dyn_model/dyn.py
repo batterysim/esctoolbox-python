@@ -22,6 +22,7 @@ data = np.zeros(len(mags), dtype=object)
 
 # load battery cell data for each temperature as objects then store in data array
 # note that data files are in the dyn_data folder
+print('Load files')
 for idx, temp in enumerate(temps):
     mag = mags[idx]
     if temp < 0:
@@ -30,14 +31,14 @@ for idx, temp in enumerate(temps):
                  f'../dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s2.csv',
                  f'../dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s3.csv']
         data[idx] = DataModel(temp, files)
-        print('Loaded files', *files, sep='\n')
+        print(*files, sep='\n')
     else:
         tempfmt = f'{abs(temp):02}'
         files = [f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s1.csv',
                  f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s2.csv',
                  f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s3.csv']
         data[idx] = DataModel(temp, files)
-        print('Loaded files', *files, sep='\n')
+        print(*files, sep='\n')
 
 processDynamic(data, modelocv, numpoles, 2)
 

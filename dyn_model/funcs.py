@@ -67,8 +67,14 @@ def SISOsubid(y, u, n):
         U[k] = u[k:k+j]
 
     # Compute the R factor
-    # TODO continue line 353 in processDynamic.m
+    UY = np.concatenate((U, Y))     # combine U and Y into one array
+    q, r = np.linalg.qr(UY.T)       # QR decomposition
+    R = r.T                         # transpose of upper triangle 
 
+    # STEP 1: Calculate oblique and orthogonal projections
+    # ------------------------------------------------------------------
+
+    # TODO continue with line 363 in processDynamic.m
     ipdb.set_trace()
 
     return A
@@ -121,9 +127,10 @@ def minfn(data, model, theTemp):
     vest1 = data[ind].OCV
     verr = vk - vest1
 
-    ipdb.set_trace()
     # Second modeling step: Compute time constants in "A" matrix
-    A = SISOsubid(-np.diff(verr), np.diff(etaik), numpoles)
+    y = -np.diff(verr)
+    u = np.diff(etaik)
+    A = SISOsubid(y, u, numpoles)
     
     return cost, model
 
