@@ -6,6 +6,7 @@ import ipdb
 import numpy as np
 from scipy.optimize import fminbound
 
+np.set_printoptions(linewidth=120, precision=4, suppress=True)
 
 def OCVfromSOCtemp(soc, temp, model):
     """ OCV function """
@@ -69,12 +70,81 @@ def SISOsubid(y, u, n):
     # Compute the R factor
     UY = np.concatenate((U, Y))     # combine U and Y into one array
     q, r = np.linalg.qr(UY.T)       # QR decomposition
-    R = r.T                         # transpose of upper triangle 
+    R = r.T                         # transpose of upper triangle
 
     # STEP 1: Calculate oblique and orthogonal projections
     # ------------------------------------------------------------------
 
-    # TODO continue with line 363 in processDynamic.m
+    Rf = R[-i:]                                 # future outputs
+    Rp = np.concatenate((R[:i], R[2*i:3*i]))    # past inputs and outputs
+    Ru = R[i:twoi, :twoi]                       # future inputs
+
+    RfRu = np.linalg.lstsq(Ru.T, Rf[:, :twoi].T)[0].T
+    RfRuRu = RfRu.dot(Ru)
+    tm1 = Rf[:, :twoi] - RfRuRu
+    tm2 = Rf[:, twoi:4*i]
+    Rfp = np.concatenate((tm1, tm2), axis=1)    # perpendicular future outputs
+
+    RpRu = np.linalg.lstsq(Ru.T, Rp[:, :twoi].T)[0].T
+    RpRuRu = RpRu.dot(Ru)
+    tm3 = Rp[:, :twoi] - RpRuRu
+    tm4 = Rp[:, twoi:4*i]
+    Rpp = np.concatenate((tm3, tm4), axis=1)    # perpendicular past inputs and outputs
+
+    # The oblique projection is computed as (6.1) in VODM, page 166.
+    # obl/Ufp = Yf/Ufp * pinv(Wp/Ufp) * (Wp/Ufp)
+    # The extra projection on Ufp (Uf perpendicular) tends to give
+    # better numerical conditioning (see algo on VODM page 131)
+
+    # Funny rank check (SVD takes too long)
+    # This check is needed to avoid rank deficiency warnings
+
+    nmRpp = np.linalg.norm(Rpp[:, 3*i-3:-i], ord='fro')
+    if nmRpp < 1e-10:
+        # oblique projection, (Rfp*pinv(Rpp')') * Rp
+        Ob = Rfp.dot(np.linalg.pinv(Rpp.T).T).dot(Rp)
+    else:
+        # oblique projection, (Rfp/Rpp) * Rp
+        Ob = (np.linalg.lstsq(Rpp.T, Rfp.T)[0].T).dot(Rp)
+
+    # STEP 2: Compute weighted oblique projection and its SVD
+    #         Extra projection of Ob on Uf perpendicular
+    # ------------------------------------------------------------------
+
+    ObRu = np.linalg.lstsq(Ru.T, Ob[:, :twoi].T)[0].T
+    ObRuRu = ObRu.dot(Ru)
+    tm5 = Ob[:, :twoi] - ObRuRu
+    tm6 = Ob[:, twoi:4*i]
+    WOW = np.concatenate((tm5, tm6), axis=1)
+
+    U, S, _ = np.linalg.svd(WOW, full_matrices=False)
+    ss = np.diag(S)
+
+    # STEP 3: Partitioning U into U1 and U2 (the latter is not used)
+    # ------------------------------------------------------------------
+
+    U1 = U[:, :n]       # determine U1
+
+    # STEP 4: Determine gam = Gamma(i) and gamm = Gamma(i-1)
+    # ------------------------------------------------------------------
+
+    gam = U1 * np.diag(np.sqrt(ss[:n]))
+    gamm = gam[0, i-2]
+    gam_inv = np.linalg.pinv(gam)[0]            # pseudo inverse of gam
+    gamm2 = np.array([[gamm], [gamm]])
+    gamm_inv = np.linalg.pinv(gamm2)[0][0]*2    # pseudo inverse of gamm
+
+    # STEP 5: Determine A matrix (also C, which is not used)
+    # ------------------------------------------------------------------
+
+    tm7 = np.concatenate((gam_inv.dot(R[-i:, :-i]), np.zeros(n)))
+    tm8 = R[i:twoi, 0:3*i+1]
+    Rhs = np.vstack((tm7, tm8))
+    Lhs = np.vstack((gamm_inv*R[-i+1, :-i+1], R[-i, :-i+1]))
+    sol = np.linalg.lstsq(Rhs.T, Lhs.T)[0].T    # solve least squares for [A; C]
+    A = sol[n-1, n-1]
+
+    # TODO continue on line 412 in processDynamic.m
     ipdb.set_trace()
 
     return A
