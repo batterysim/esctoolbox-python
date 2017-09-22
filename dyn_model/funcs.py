@@ -50,8 +50,22 @@ def OCVfromSOCtemp(soc, temp, model):
 
 def SISOsubid(y, u, n):
     """
-    siso function
+    Identify state-space "A" matrix from input-output data.
+    y: vector of measured outputs
+    u: vector of measured inputs
+    n: number of poles in solution
+    A: discrete-time state-space state-transition matrix.
+
+    Theory from "Subspace Identification for Linear Systems Theory - Implementation
+    - Applications" Peter Van Overschee / Bart De Moor (VODM) Kluwer Academic
+      Publishers, 1996. Combined algorithm: Figure 4.8 page 131 (robust). Robust
+      implementation: Figure 6.1 page 169.
+
+    Code adapted from "subid.m" in "Subspace Identification for Linear Systems"
+    toolbox on MATLAB CENTRAL file exchange, originally by Peter Van Overschee,
+    Dec. 1995
     """
+
     ny = len(y)
     i = 2*n
     twoi = 4*n
@@ -101,10 +115,10 @@ def SISOsubid(y, u, n):
 
     nmRpp = np.linalg.norm(Rpp[:, 3*i-3:-i], ord='fro')
     if nmRpp < 1e-10:
-        # oblique projection, (Rfp*pinv(Rpp')') * Rp
+        # oblique projection as (Rfp*pinv(Rpp')') * Rp
         Ob = Rfp.dot(np.linalg.pinv(Rpp.T).T).dot(Rp)
     else:
-        # oblique projection, (Rfp/Rpp) * Rp
+        # oblique projection as (Rfp/Rpp) * Rp
         Ob = (np.linalg.lstsq(Rpp.T, Rfp.T)[0].T).dot(Rp)
 
     # STEP 2: Compute weighted oblique projection and its SVD
@@ -142,29 +156,16 @@ def SISOsubid(y, u, n):
     Rhs = np.vstack((tm7, tm8))
     Lhs = np.vstack((gamm_inv*R[-i+1, :-i+1], R[-i, :-i+1]))
     sol = np.linalg.lstsq(Rhs.T, Lhs.T)[0].T    # solve least squares for [A; C]
-    A = sol[n-1, n-1]
-
-    # TODO continue on line 412 in processDynamic.m
-    ipdb.set_trace()
+    A = sol[n-1, n-1]                           # extract A
 
     return A
 
 
-def optfn(x, data, model, theTemp):
-    """
-    optfn function
-    """
-
-    idx, = np.where(np.array(model.temps) == theTemp)
-    model.GParam[idx] = abs(x)
-
-    cost, _ = minfn(data, model, theTemp)
-    return cost
-
-
 def minfn(data, model, theTemp):
     """
-    minfn function
+    Using an assumed value for gamma (already stored in the model), find optimum
+    values for remaining cell parameters, and compute the RMS error between true
+    and predicted cell voltage
     """
 
     alltemps = [d.temp for d in data]
@@ -201,13 +202,82 @@ def minfn(data, model, theTemp):
     y = -np.diff(verr)
     u = np.diff(etaik)
     A = SISOsubid(y, u, numpoles)
+    eigA = A
+
+    RCfact = A
+    RC = -1/np.log(A)
+
+    # Simulate the R-C filters to find R-C currents
+    # assume no control-system toolbox
+    vrcRaw = np.zeros(len(etaik))
+    for vrcK in range(len(etaik)-1):
+        vrcRaw[vrcK+1] = RCfact*vrcRaw[vrcK] + (1-RCfact)*etaik[vrcK]
+
+    # Third modeling step: Hysteresis parameters
+    # TODO continue on line 257 on processDynamic.m
+
+    ipdb.set_trace()
     
     return cost, model
 
 
+def optfn(x, data, model, theTemp):
+    """
+    This minfn works for the enhanced self-correcting cell model
+    """
+
+    idx, = np.where(np.array(model.temps) == theTemp)
+    model.GParam[idx] = abs(x)
+
+    cost, _ = minfn(data, model, theTemp)
+    return cost
+
+
 def processDynamic(data, modelocv, numpoles, doHyst):
     """
-    DYN function
+    Technical note: PROCESSDYNAMIC assumes that specific Arbin test scripts have
+    been executed to generate the input files.  "makeMATfiles.m" converts the raw
+    Excel data files into "MAT" format where the MAT files have fields for time,
+    step, current, voltage, chgAh, and disAh for each script run.
+
+    The results from three scripts are required at every temperature.
+    The steps in each script file are assumed to be:
+    Script 1 (thermal chamber set to test temperature):
+        Step 1: Rest @ 100% SOC to acclimatize to test temperature
+        Step 2: Discharge @ 1C to reach ca. 90% SOC
+        Step 3: Repeatedly execute dynamic profiles (and possibly intermediate
+        rests) until SOC is around 10%
+    Script 2 (thermal chamber set to 25 degC):
+        Step 1: Rest ca. 10% SOC to acclimatize to 25 degC
+        Step 2: Discharge to min voltage (ca. C/3)
+        Step 3: Rest
+        Step 4: Constant voltage at vmin until current small (ca. C/30)
+        Steps 5-7: Dither around vmin
+        Step 8: Rest
+    Script 3 (thermal chamber set to 25 degC):
+        Step 2: Charge @ 1C to max voltage
+        Step 3: Rest
+        Step 4: Constant voltage at vmax until current small (ca. C/30)
+        Steps 5-7: Dither around vmax
+        Step 8: Rest
+
+    All other steps (if present) are ignored by PROCESSDYNAMIC. The time step
+    between data samples must be uniform -- we assume a 1s sample period in this
+    code.
+
+    The inputs:
+    - data: An array, with one entry per temperature to be processed.
+        One of the array entries must be at 25 degC. The fields of "data" are:
+        temp (the test temperature), script1, script 2, and script 3, where the
+        latter comprise data collected from each script.  The sub-fields of
+        these script structures that are used by PROCESSDYNAMIC are the
+        vectors: current, voltage, chgAh, and disAh
+    - model: The output from processOCV, comprising the OCV model
+    - numpoles: The number of R-C pairs in the model
+    - doHyst: 0 if no hysteresis model desired; 1 if hysteresis desired
+
+    The output:
+    - model: A modified model, which now contains the dynamic fields filled in.
     """
 
     class Model:
