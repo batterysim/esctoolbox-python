@@ -28,8 +28,8 @@ for s in ['s1', 's2', 's3']:
 
     plt.figure()
     plt.plot(t, volt, lw=2)
-    plt.xlabel('Time')
-    plt.ylabel('Voltage')
+    plt.xlabel('Time (min)')
+    plt.ylabel('Voltage (V)')
     plt.title(name)
 
 
