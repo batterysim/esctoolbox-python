@@ -2,7 +2,7 @@
 Plot the data from the four A123 battery tests conducted at a range of
 temperatures. Change the tc variable to view plots from the other test data.
 For example, change the tc string to N05 to create plots for the CSV files
-named A123_OCV_N05_S1, A123_OCV_N05_S2, A123_OCV_N05_S3, and A123_OCV_N05_S4. 
+named A123_OCV_N05_S1, A123_OCV_N05_S2, A123_OCV_N05_S3, and A123_OCV_N05_S4.
 """
 
 import matplotlib.pyplot as plt
