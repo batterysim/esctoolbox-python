@@ -1,24 +1,34 @@
 """
-Functions for DYN model
+Functions used by the dyn_model
 """
 
-import ipdb
-import numpy as np
-from scipy.optimize import fminbound
+# Modules
+# ------------------------------------------------------------------------------
 
-np.set_printoptions(linewidth=120, precision=4, suppress=True)
+import ipdb
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.optimize import fminbound, nnls
+from models import ModelDyn
+
+# Functions
+# ------------------------------------------------------------------------------
 
 def OCVfromSOCtemp(soc, temp, model):
     """ OCV function """
-    soccol = soc             # force soc to be column vector
     SOC = model.SOC          # force to be column vector
     OCV0 = model.OCV0        # force to be column vector
     OCVrel = model.OCVrel    # force to be column vector
 
-    tempcol = temp * np.ones(len(soccol))
+    # if soc is scalar then make it a vector
+    soccol = np.asarray(soc)
+    if soccol.ndim == 0:
+        soccol = soccol[None]
+
+    tempcol = temp * np.ones(np.size(soccol))
 
     diffSOC = SOC[1] - SOC[0]           # spacing between SOC points - assume uniform
-    ocv = np.zeros(len(soccol))         # initialize output to zero
+    ocv = np.zeros(np.size(soccol))     # initialize output to zero
     I1, = np.where(soccol <= SOC[0])    # indices of socs below model-stored data
     I2, = np.where(soccol >= SOC[-1])   # and of socs above model-stored data
     I3, = np.where((soccol > SOC[0]) & (soccol < SOC[-1]))   # the rest of them
@@ -26,13 +36,13 @@ def OCVfromSOCtemp(soc, temp, model):
 
     # for voltages less than lowest stored soc datapoint, extrapolate off
     # low end of table
-    if len(I1) != 0:
+    if I1.any():
         dv = (OCV0[1] + tempcol*OCVrel[1]) - (OCV0[0] + tempcol*OCVrel[0])
         ocv[I1] = (soccol[I1] - SOC[0])*dv[I1]/diffSOC + OCV0[0] + tempcol[I1]*OCVrel[0]
 
     # for voltages greater than highest stored soc datapoint, extrapolate off
     # high end of table
-    if len(I2) != 0:
+    if I2.any():
         dv = (OCV0[-1] + tempcol*OCVrel[-1]) - (OCV0[-2] + tempcol*OCVrel[-2])
         ocv[I2] = (soccol[I2] - SOC[-1])*dv[I2]/diffSOC + OCV0[-1] + tempcol[I2]*OCVrel[-1]
 
@@ -202,7 +212,7 @@ def minfn(data, model, theTemp):
     y = -np.diff(verr)
     u = np.diff(etaik)
     A = SISOsubid(y, u, numpoles)
-    eigA = A
+    # eigA = A
 
     RCfact = A
     RC = -1/np.log(A)
@@ -214,10 +224,52 @@ def minfn(data, model, theTemp):
         vrcRaw[vrcK+1] = RCfact*vrcRaw[vrcK] + (1-RCfact)*etaik[vrcK]
 
     # Third modeling step: Hysteresis parameters
-    # TODO continue on line 257 on processDynamic.m
+    H = np.vstack((hh, sik, -etaik, -vrcRaw)).T
+    W = nnls(H, verr)
+    M = W[0][0]
+    M0 = W[0][1]
+    R0 = W[0][2]
+    Rfact = W[0][3]
 
-    ipdb.set_trace()
-    
+    idx, = np.where(np.array(model.temps) == data[ind].temp)[0]
+    model.R0Param[idx] = R0
+    model.M0Param[idx] = M0
+    model.MParam[idx] = M
+    model.RCParam[idx] = RC
+    model.RParam[idx] = Rfact
+
+    vest2 = vest1 + M*hh + M0*sik - R0*etaik - vrcRaw*Rfact
+    verr = vk - vest2
+
+    # plot voltages
+    plt.figure(1)
+    plt.plot(tk[::10]/60, vk[::10], label='voltage')
+    plt.plot(tk[::10]/60, vest1[::10], label='vest1 (OCV)')
+    plt.plot(tk[::10]/60, vest2[::10], label='vest2 (DYN)')
+    plt.xlabel('Time (min)')
+    plt.ylabel('Voltage (V)')
+    plt.title(f'Voltage and estimates at T = {data[ind].temp} C')
+    plt.legend(loc='best', numpoints=1)
+    plt.show()
+
+    # plot modeling errors
+    plt.figure(2)
+    plt.plot(tk[::10]/60, verr[::10], label='verr')
+    plt.xlabel('Time (min)')
+    plt.ylabel('Error (V)')
+    plt.title(f'Modeling error at T = {data[ind].temp} C')
+    plt.show()
+
+    # Compute RMS error only on data roughly in 5% to 95% SOC
+    v1 = OCVfromSOCtemp(0.95, data[ind].temp, model)[0]
+    v2 = OCVfromSOCtemp(0.05, data[ind].temp, model)[0]
+    N1 = np.where(vk < v1)[0][0]
+    N2 = np.where(vk < v2)[0][0]
+
+    rmserr = np.sqrt(np.mean(verr[N1:N2]**2))
+    cost = np.sum(rmserr)
+    print(f'RMS error = {cost*1000:.2f} mV')
+
     return cost, model
 
 
@@ -280,20 +332,6 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     - model: A modified model, which now contains the dynamic fields filled in.
     """
 
-    class Model:
-        """ Model containing results from this function """
-        def __init__(self):
-            self.temps = None
-            self.etaParam = None
-            self.QParam = None
-            self.GParam = None
-            self.M0Param = None
-            self.MParam = None
-            self.R0Param = None
-            self.RCParam = None
-            self.RParam = None
-
-
     # Step 1: Compute capacity and coulombic efficiency for every test
     # ------------------------------------------------------------------
 
@@ -334,35 +372,40 @@ def processDynamic(data, modelocv, numpoles, doHyst):
         data[k].Q = Q
         allQs[k] = Q
 
-    model = Model()
-    model.temps = alltemps
-    model.etaParam = alletas
-    model.QParam = allQs
+    modeldyn = ModelDyn()
+    modeldyn.temps = alltemps
+    modeldyn.etaParam = alletas
+    modeldyn.QParam = allQs
 
     # Step 2: Compute OCV for "discharge portion" of test
     # ------------------------------------------------------------------
 
     for k, _ in enumerate(data):
-        etaParam = model.etaParam[k]
+        etaParam = modeldyn.etaParam[k]
         etaik = data[k].s1.current.copy()
         etaik[etaik < 0] = etaParam*etaik[etaik < 0]
         data[k].Z = 1 - np.cumsum(etaik) * 1/(data[k].Q * 3600)
         data[k].OCV = OCVfromSOCtemp(data[k].Z, alltemps[k], modelocv)
 
-    # Step 3: Now, optimize!)
+    # Step 3: Now, optimize!
     # ------------------------------------------------------------------
 
-    model.GParam = np.zeros(len(model.temps))   # gamma hysteresis parameter
-    model.M0Param = np.zeros(len(model.temps))  # M0 hysteresis parameter
-    model.MParam = np.zeros(len(model.temps))   # M hysteresis parameter
-    model.R0Param = np.zeros(len(model.temps))  # R0 ohmic resistance parameter
-    model.RCParam = np.zeros(len(model.temps))  # time constant
-    model.RParam = np.zeros(len(model.temps))   # Rk
+    modeldyn.GParam = np.zeros(len(modeldyn.temps))   # gamma hysteresis parameter
+    modeldyn.M0Param = np.zeros(len(modeldyn.temps))  # M0 hysteresis parameter
+    modeldyn.MParam = np.zeros(len(modeldyn.temps))   # M hysteresis parameter
+    modeldyn.R0Param = np.zeros(len(modeldyn.temps))  # R0 ohmic resistance parameter
+    modeldyn.RCParam = np.zeros(len(modeldyn.temps))  # time constant
+    modeldyn.RParam = np.zeros(len(modeldyn.temps))   # Rk
+
+    modeldyn.SOC = modelocv.SOC        # copy SOC values from OCV model
+    modeldyn.OCV0 = modelocv.OCV0      # copy OCV0 values from OCV model
+    modeldyn.OCVrel = modelocv.OCVrel  # copy OCVrel values from OCV model
 
     tempidx = 0
-    theTemp = model.temps[tempidx]
+    theTemp = modeldyn.temps[tempidx]
     print('Processing temperature', theTemp, 'C')
 
-    g = abs(fminbound(optfn, 1, 250, args=(data, model, theTemp)))
+    g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, theTemp)))
+    print('g =', g)
 
 

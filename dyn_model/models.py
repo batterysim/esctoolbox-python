@@ -1,13 +1,20 @@
 """
-Models for the DYN calculations
+Class objects for the dyn_model calculations
 """
 
+# Modules
+# ------------------------------------------------------------------------------
+
+import pickle
 import pandas as pd
 
+# Class Objects
+# ------------------------------------------------------------------------------
 
 class DataModel:
     """
-    Data from battery script tests.
+    Data from battery script tests. Requires the Script class which reads the
+    csv file and assigns the data to class attributes.
     """
 
     def __init__(self, temp, csvfiles):
@@ -49,6 +56,7 @@ class ModelOcv:
     """
     Model representing OCV results.
     """
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, OCV0, OCVrel, SOC, OCV, SOC0, SOCrel, OCVeta, OCVQ):
         self.OCV0 = OCV0
@@ -59,5 +67,35 @@ class ModelOcv:
         self.SOCrel = SOCrel
         self.OCVeta = OCVeta
         self.OCVQ = OCVQ
+
+    @classmethod
+    def load(cls, pfile):
+        """
+        Load attributes from pickle file where pfile is string representing
+        path to the pickle file.
+        """
+        ocv = pickle.load(open(pfile, 'rb'))
+        return cls(ocv.OCV0, ocv.OCVrel, ocv.SOC, ocv.OCV, ocv.SOC0, ocv.SOCrel, ocv.OCVeta, ocv.OCVQ)
+
+
+class ModelDyn:
+    """
+    Model representing results from the dynamic calculations.
+    """
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self):
+        self.temps = None
+        self.etaParam = None
+        self.QParam = None
+        self.GParam = None
+        self.M0Param = None
+        self.MParam = None
+        self.R0Param = None
+        self.RCParam = None
+        self.RParam = None
+        self.SOC = None
+        self.OCV0 = None
+        self.OCVrel = None
 
 

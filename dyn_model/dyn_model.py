@@ -2,11 +2,10 @@
 Dyn model
 """
 
-import pickle
 import numpy as np
 
-from models import DataModel
 from funcs import processDynamic
+from models import DataModel, ModelOcv
 
 # parameters
 cellID = 'A123'     # cell identifier
@@ -15,7 +14,7 @@ temps = [-25, -15, -5, 5, 15, 25, 35, 45]   # temperatures
 mags = [10, 10, 30, 45, 45, 50, 50, 50]     # A123
 
 # read model OCV file, previously computed by runProcessOCV
-modelocv = pickle.load(open('../ocv_model/modelocv.pickle', 'rb'))
+modelocv = ModelOcv.load('../ocv_model/modelocv.pickle')
 
 # initialize array to store battery cell data
 data = np.zeros(len(mags), dtype=object)
