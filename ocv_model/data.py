@@ -35,6 +35,20 @@ test_time4 = df4['Test_Time(s)']
 current4 = df4['Current(A)']
 voltage4 = df4['Voltage(V)']
 
+# Compare Temperature Data
+# ------------------------------------------------------------------------------
+
+temps = ['N05', 'N15', 'N25', 'P05', 'P15', 'P25', 'P35', 'P45']
+times = []
+volts = []
+
+for t in temps:
+    df = pd.read_csv('../ocv_data/A123_OCV_' + t + '_S1.csv')
+    time = df['Test_Time(s)'].values
+    voltage = df['Voltage(V)'].values
+    times.append(time)
+    volts.append(voltage)
+
 # Plot
 # ------------------------------------------------------------------------------
 
@@ -42,6 +56,20 @@ plt.ion()
 plt.close('all')
 
 # Figure 1
+plt.figure(1)
+plt.plot(times[0], volts[0], label='-5')
+plt.plot(times[1], volts[1], label='-15')
+plt.plot(times[2], volts[2], label='-25')
+plt.plot(times[3], volts[3], label='5')
+plt.plot(times[4], volts[4], label='15')
+plt.plot(times[5], volts[5], label='25')
+plt.plot(times[6], volts[6], label='35')
+plt.plot(times[7], volts[7], label='45')
+plt.legend(loc='best')
+plt.xlabel('Time (s)')
+plt.ylabel('Voltage (V)')
+
+# Figure 2
 fig, ax1 = plt.subplots()
 plt.title('A123_OCV_' + tc + '_S1')
 
@@ -55,7 +83,7 @@ ax2.plot(test_time1, voltage1, color='r', lw=2, label='voltage')
 ax2.set_ylabel('Voltage (V)', color='r')
 ax2.tick_params('y', colors='r')
 
-# Figure 2
+# Figure 3
 fig, ax1 = plt.subplots()
 plt.title('A123_OCV_' + tc + '_S2')
 
@@ -69,7 +97,7 @@ ax2.plot(test_time2, voltage2, color='r', lw=2, label='voltage')
 ax2.set_ylabel('Voltage (V)', color='r')
 ax2.tick_params('y', colors='r')
 
-# Figure 3
+# Figure 4
 fig, ax1 = plt.subplots()
 plt.title('A123_OCV_' + tc + '_S3')
 
@@ -83,7 +111,7 @@ ax2.plot(test_time3, voltage3, color='r', lw=2, label='voltage')
 ax2.set_ylabel('Voltage (V)', color='r')
 ax2.tick_params('y', colors='r')
 
-# Figure 4
+# Figure 5
 fig, ax1 = plt.subplots()
 plt.title('A123_OCV_' + tc + '_S4')
 
