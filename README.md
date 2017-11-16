@@ -28,7 +28,11 @@ See the comments in each file for more information.
 
 ## DYN model
 
-In progress...
+The dynamic model files are located in the `dyn_model/` folder where the
+`dyn_model.py` is the main file to run. The data from the dynamic battery tests
+are located in the `dyn_data/` folder.
+
+See the comments in each file for more information.
 
 ## Installation
 
