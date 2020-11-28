@@ -103,13 +103,13 @@ def SISOsubid(y, u, n):
     Rp = np.concatenate((R[:i], R[2*i:3*i]))    # past inputs and outputs
     Ru = R[i:twoi, :twoi]                       # future inputs
 
-    RfRu = np.linalg.lstsq(Ru.T, Rf[:, :twoi].T, rcond=-1)[0].T
+    RfRu = np.linalg.lstsq(Ru.T, Rf[:, :twoi].T, rcond=None)[0].T
     RfRuRu = RfRu.dot(Ru)
     tm1 = Rf[:, :twoi] - RfRuRu
     tm2 = Rf[:, twoi:4*i]
     Rfp = np.concatenate((tm1, tm2), axis=1)    # perpendicular future outputs
 
-    RpRu = np.linalg.lstsq(Ru.T, Rp[:, :twoi].T, rcond=-1)[0].T
+    RpRu = np.linalg.lstsq(Ru.T, Rp[:, :twoi].T, rcond=None)[0].T
     RpRuRu = RpRu.dot(Ru)
     tm3 = Rp[:, :twoi] - RpRuRu
     tm4 = Rp[:, twoi:4*i]
@@ -129,13 +129,13 @@ def SISOsubid(y, u, n):
         Ob = Rfp.dot(np.linalg.pinv(Rpp.T).T).dot(Rp)
     else:
         # oblique projection as (Rfp/Rpp) * Rp
-        Ob = (np.linalg.lstsq(Rpp.T, Rfp.T)[0].T).dot(Rp)
+        Ob = (np.linalg.lstsq(Rpp.T, Rfp.T, rcond=None)[0].T).dot(Rp)
 
     # STEP 2: Compute weighted oblique projection and its SVD
     #         Extra projection of Ob on Uf perpendicular
     # ------------------------------------------------------------------
 
-    ObRu = np.linalg.lstsq(Ru.T, Ob[:, :twoi].T, rcond=-1)[0].T
+    ObRu = np.linalg.lstsq(Ru.T, Ob[:, :twoi].T, rcond=None)[0].T
     ObRuRu = ObRu.dot(Ru)
     tm5 = Ob[:, :twoi] - ObRuRu
     tm6 = Ob[:, twoi:4*i]
@@ -165,7 +165,7 @@ def SISOsubid(y, u, n):
     tm8 = R[i:twoi, 0:3*i+1]
     Rhs = np.vstack((tm7, tm8))
     Lhs = np.vstack((gamm_inv*R[-i+1, :-i+1], R[-i, :-i+1]))
-    sol = np.linalg.lstsq(Rhs.T, Lhs.T, rcond=-1)[0].T    # solve least squares for [A; C]
+    sol = np.linalg.lstsq(Rhs.T, Lhs.T, rcond=None)[0].T    # solve least squares for [A; C]
     A = sol[n-1, n-1]                           # extract A
 
     return A
