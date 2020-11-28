@@ -250,7 +250,7 @@ def minfn(data, model, theTemp):
     plt.ylabel('Voltage (V)')
     plt.title(f'Voltage and estimates at T = {data[ind].temp} C')
     plt.legend(loc='best', numpoints=1)
-    plt.show()
+    #plt.show()
 
     # plot modeling errors
     plt.figure(2)
@@ -258,7 +258,7 @@ def minfn(data, model, theTemp):
     plt.xlabel('Time (min)')
     plt.ylabel('Error (V)')
     plt.title(f'Modeling error at T = {data[ind].temp} C')
-    plt.show()
+    #plt.show()
 
     # Compute RMS error only on data roughly in 5% to 95% SOC
     v1 = OCVfromSOCtemp(0.95, data[ind].temp, model)[0]
