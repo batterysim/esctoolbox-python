@@ -9,6 +9,8 @@ import pickle
 from models import BatteryData, FileData, ModelOcv
 from funcs import OCVfromSOCtemp
 
+from pathlib import Path
+
 # Parameters and Data
 # ------------------------------------------------------------------------------
 
@@ -31,13 +33,13 @@ data = np.zeros(len(temps), dtype=object)
 for idx, temp in enumerate(temps):
     if temp < 0:
         tempfmt = f'{abs(temp):02}'
-        files = [f'../ocv_data/A123_OCV_N{tempfmt}_S1.csv', f'../ocv_data/A123_OCV_N{tempfmt}_S2.csv',
-                 f'../ocv_data/A123_OCV_N{tempfmt}_S3.csv', f'../ocv_data/A123_OCV_N{tempfmt}_S4.csv']
+        files = [Path(f'./ocv_data/A123_OCV_N{tempfmt}_S1.csv'), Path(f'./ocv_data/A123_OCV_N{tempfmt}_S2.csv'),
+                 Path(f'./ocv_data/A123_OCV_N{tempfmt}_S3.csv'), Path(f'./ocv_data/A123_OCV_N{tempfmt}_S4.csv')]
         data[idx] = BatteryData(files)
     else:
         tempfmt = f'{abs(temp):02}'
-        files = [f'../ocv_data/A123_OCV_P{tempfmt}_S1.csv', f'../ocv_data/A123_OCV_P{tempfmt}_S2.csv',
-                 f'../ocv_data/A123_OCV_P{tempfmt}_S3.csv', f'../ocv_data/A123_OCV_P{tempfmt}_S4.csv']
+        files = [Path(f'./ocv_data/A123_OCV_P{tempfmt}_S1.csv'), Path(f'./ocv_data/A123_OCV_P{tempfmt}_S2.csv'),
+                 Path(f'./ocv_data/A123_OCV_P{tempfmt}_S3.csv'), Path(f'./ocv_data/A123_OCV_P{tempfmt}_S4.csv')]
         data[idx] = BatteryData(files)
 
 # initial array to store calculated data
