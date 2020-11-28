@@ -28,16 +28,16 @@ for idx, temp in enumerate(temps):
     mag = mags[idx]
     if temp < 0:
         tempfmt = f'{abs(temp):02}'
-        files = [f'../dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s1.csv',
-                 f'../dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s2.csv',
-                 f'../dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s3.csv']
+        files = [Path(f'./dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s1.csv'),
+                 Path(f'./dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s2.csv'),
+                 Path(f'./dyn_data/{cellID}_DYN_{mag}_N{tempfmt}_s3.csv')]
         data[idx] = DataModel(temp, files)
         print(*files, sep='\n')
     else:
         tempfmt = f'{abs(temp):02}'
-        files = [f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s1.csv',
-                 f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s2.csv',
-                 f'../dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s3.csv']
+        files = [Path(f'./dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s1.csv'),
+                 Path(f'./dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s2.csv'),
+                 Path(f'./dyn_data/{cellID}_DYN_{mag}_P{tempfmt}_s3.csv')]
         data[idx] = DataModel(temp, files)
         print(*files, sep='\n')
 
