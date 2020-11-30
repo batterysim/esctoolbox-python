@@ -401,11 +401,13 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     modeldyn.OCV0 = modelocv.OCV0      # copy OCV0 values from OCV model
     modeldyn.OCVrel = modelocv.OCVrel  # copy OCVrel values from OCV model
 
-    tempidx = 0
-    theTemp = modeldyn.temps[tempidx]
-    print('Processing temperature', theTemp, 'C')
+    for theTemp in modeldyn.temps:
+        print('Processing temperature', theTemp, 'C')
 
-    g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, theTemp)))
-    print('g =', g)
+        if doHyst:
+            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, theTemp)))
+            print('g =', g)
 
-
+        else:
+            g = 0 
+    return modeldyn   
