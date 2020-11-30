@@ -41,5 +41,4 @@ for idx, temp in enumerate(temps):
         data[idx] = DataModel(temp, files)
         print(*files, sep='\n')
 
-processDynamic(data, modelocv, numpoles, 2)
-
+processDynamic(data, modelocv, numpoles, 1)

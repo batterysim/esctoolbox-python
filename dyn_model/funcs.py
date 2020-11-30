@@ -93,7 +93,7 @@ def SISOsubid(y, u, n):
 
     # Compute the R factor
     UY = np.concatenate((U, Y))     # combine U and Y into one array
-    q, r = np.linalg.qr(UY.T)       # QR decomposition
+    _, r = np.linalg.qr(UY.T)       # QR decomposition
     R = r.T                         # transpose of upper triangle
 
     # STEP 1: Calculate oblique and orthogonal projections
