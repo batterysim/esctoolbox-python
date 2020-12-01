@@ -3,6 +3,7 @@ Dyn model
 """
 
 import numpy as np
+import pickle
 
 from funcs import processDynamic
 from models import DataModel, ModelOcv
@@ -41,4 +42,9 @@ for idx, temp in enumerate(temps):
         data[idx] = DataModel(temp, files)
         print(*files, sep='\n')
 
-processDynamic(data, modelocv, numpoles, 1)
+modeldyn = processDynamic(data, modelocv, numpoles, 1)
+
+# store ocv results in model object then save to disk
+pickle.dump(modeldyn, open('modeldyn.pickle', 'wb'))
+
+print('here')
