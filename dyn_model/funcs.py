@@ -171,7 +171,7 @@ def SISOsubid(y, u, n):
     return A
 
 
-def minfn(data, model, theTemp):
+def minfn(data, model, theTemp, doHyst):
     """
     Using an assumed value for gamma (already stored in the model), find optimum
     values for remaining cell parameters, and compute the RMS error between true
@@ -224,12 +224,20 @@ def minfn(data, model, theTemp):
         vrcRaw[vrcK+1] = RCfact*vrcRaw[vrcK] + (1-RCfact)*etaik[vrcK]
 
     # Third modeling step: Hysteresis parameters
-    H = np.vstack((hh, sik, -etaik, -vrcRaw)).T
-    W = nnls(H, verr)
-    M = W[0][0]
-    M0 = W[0][1]
-    R0 = W[0][2]
-    Rfact = W[0][3]
+    if doHyst:
+        H = np.vstack((hh, sik, -etaik, -vrcRaw)).T
+        W = nnls(H, verr)
+        M = W[0][0]
+        M0 = W[0][1]
+        R0 = W[0][2]
+        Rfact = W[0][3]
+    else:
+        H = np.vstack((-etaik, -vrcRaw)).T
+        W = np.linalg.lstsq(H,verr, rcond=None)[0]
+        M = 0
+        M0 = 0
+        R0 = W[0]
+        Rfact = W[1]
 
     idx, = np.where(np.array(model.temps) == data[ind].temp)[0]
     model.R0Param[idx] = R0
@@ -273,7 +281,7 @@ def minfn(data, model, theTemp):
     return cost, model
 
 
-def optfn(x, data, model, theTemp):
+def optfn(x, data, model, theTemp, doHyst):
     """
     This minfn works for the enhanced self-correcting cell model
     """
@@ -281,7 +289,7 @@ def optfn(x, data, model, theTemp):
     idx, = np.where(np.array(model.temps) == theTemp)
     model.GParam[idx] = abs(x)
 
-    cost, _ = minfn(data, model, theTemp)
+    cost, _ = minfn(data, model, theTemp, doHyst)
     return cost
 
 
@@ -401,13 +409,16 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     modeldyn.OCV0 = modelocv.OCV0      # copy OCV0 values from OCV model
     modeldyn.OCVrel = modelocv.OCVrel  # copy OCVrel values from OCV model
 
-    for theTemp in modeldyn.temps:
-        print('Processing temperature', theTemp, 'C')
+    for theTemp in range(len(modeldyn.temps)):
+        temp = modeldyn.temps[theTemp]
+        print('Processing temperature', temp, 'C')
 
         if doHyst:
-            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, theTemp)))
+            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, temp, doHyst)))
             print('g =', g)
 
         else:
-            g = 0 
+            modeldyn.GParam[theTemp] = 0
+            theGParam = 0 
+            optfn(theGParam, data, modeldyn, temp, doHyst)
     return modeldyn   

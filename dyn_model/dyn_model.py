@@ -15,6 +15,7 @@ cellID = 'A123'     # cell identifier
 numpoles = 1        # number of resistor-capacitor pairs in final model
 temps = [-25, -15, -5, 5, 15, 25, 35, 45]   # temperatures
 mags = [10, 10, 30, 45, 45, 50, 50, 50]     # A123
+doHyst = 0          # 1 "find M, M0 and G params" or 0 "make hys params 0" 
 
 # read model OCV file, previously computed by runProcessOCV
 modelocv = ModelOcv.load(Path(f'./ocv_model/modelocv.pickle'))
@@ -42,7 +43,10 @@ for idx, temp in enumerate(temps):
         data[idx] = DataModel(temp, files)
         print(*files, sep='\n')
 
-modeldyn = processDynamic(data, modelocv, numpoles, 1)
+modeldyn = processDynamic(data, modelocv, numpoles, doHyst)
 
 # store ocv and dyn results in model object then save to disk
-pickle.dump(modeldyn, open('modeldyn.pickle', 'wb'))
+if doHyst:
+    pickle.dump(modeldyn, open('modeldyn.pickle', 'wb'))
+else:
+    pickle.dump(modeldyn, open('modeldynWithoutHyst.pickle', 'wb'))
