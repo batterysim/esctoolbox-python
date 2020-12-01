@@ -46,5 +46,3 @@ modeldyn = processDynamic(data, modelocv, numpoles, 1)
 
 # store ocv results in model object then save to disk
 pickle.dump(modeldyn, open('modeldyn.pickle', 'wb'))
-
-print('here')
