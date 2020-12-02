@@ -75,7 +75,7 @@ def SISOsubid(y, u, n):
     toolbox on MATLAB CENTRAL file exchange, originally by Peter Van Overschee,
     Dec. 1995
     """
-
+    
     ny = len(y)
     i = 2*n
     twoi = 4*n
@@ -142,7 +142,7 @@ def SISOsubid(y, u, n):
     WOW = np.concatenate((tm5, tm6), axis=1)
 
     U, S, _ = np.linalg.svd(WOW, full_matrices=False)
-    ss = np.diag(S)
+    ss = S       # In np.linalg.svd S is already the diagonal, generally ss = diag(S)
 
     # STEP 3: Partitioning U into U1 and U2 (the latter is not used)
     # ------------------------------------------------------------------
@@ -152,19 +152,20 @@ def SISOsubid(y, u, n):
     # STEP 4: Determine gam = Gamma(i) and gamm = Gamma(i-1)
     # ------------------------------------------------------------------
 
-    gam = U1 * np.diag(np.sqrt(ss[:n]))
-    gamm = gam[0, i-2]
-    gam_inv = np.linalg.pinv(gam)[0]            # pseudo inverse of gam
-    gamm2 = np.array([[gamm], [gamm]])
-    gamm_inv = np.linalg.pinv(gamm2)[0][0]*2    # pseudo inverse of gamm
+    gam = U1 @ np.diag(np.sqrt(ss[:n]))
+    gamm = gam[0:(i-1),:]
+    gam_inv = np.linalg.pinv(gam)               # pseudo inverse of gam
+    gamm_inv = np.linalg.pinv(gamm)             # pseudo inverse of gamm
 
     # STEP 5: Determine A matrix (also C, which is not used)
     # ------------------------------------------------------------------
 
-    tm7 = np.concatenate((gam_inv.dot(R[-i:, :-i]), np.zeros(n)))
+    tm7 = np.concatenate((gam_inv @ R[3*i:4*i, 0:3*i], np.zeros((n,1))), axis=1)
     tm8 = R[i:twoi, 0:3*i+1]
     Rhs = np.vstack((tm7, tm8))
-    Lhs = np.vstack((gamm_inv*R[-i+1, :-i+1], R[-i, :-i+1]))
+    tm9 = gamm_inv @ R[3*i+1:4*i, 0:3*i+1]
+    tm10 = R[3*i:3*i+1, 0:3*i+1]
+    Lhs = np.vstack((tm9, tm10))
     sol = np.linalg.lstsq(Rhs.T, Lhs.T, rcond=None)[0].T    # solve least squares for [A; C]
     A = sol[n-1, n-1]                           # extract A
 
@@ -186,7 +187,7 @@ def minfn(data, model, theTemp, doHyst):
     Q = abs(model.QParam[ind])
     eta = abs(model.etaParam[ind])
     RC = abs(model.RCParam[ind])
-    numpoles = 1
+    numpoles = len(RC)
 
     ik = data[ind].s1.current.copy()
     vk = data[ind].s1.voltage.copy()
@@ -402,8 +403,8 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     modeldyn.M0Param = np.zeros(len(modeldyn.temps))  # M0 hysteresis parameter
     modeldyn.MParam = np.zeros(len(modeldyn.temps))   # M hysteresis parameter
     modeldyn.R0Param = np.zeros(len(modeldyn.temps))  # R0 ohmic resistance parameter
-    modeldyn.RCParam = np.zeros(len(modeldyn.temps))  # time constant
-    modeldyn.RParam = np.zeros(len(modeldyn.temps))   # Rk
+    modeldyn.RCParam = np.zeros((len(modeldyn.temps), numpoles))  # time constant
+    modeldyn.RParam = np.zeros((len(modeldyn.temps), numpoles))   # Rk
 
     modeldyn.SOC = modelocv.SOC        # copy SOC values from OCV model
     modeldyn.OCV0 = modelocv.OCV0      # copy OCV0 values from OCV model
