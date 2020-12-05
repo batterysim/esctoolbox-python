@@ -9,6 +9,7 @@ import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import fminbound, nnls
+from scipy.signal import dlsim, dlti
 from models import ModelDyn
 
 # Functions
@@ -167,7 +168,7 @@ def SISOsubid(y, u, n):
     tm10 = R[3*i:3*i+1, 0:3*i+1]
     Lhs = np.vstack((tm9, tm10))
     sol = np.linalg.lstsq(Rhs.T, Lhs.T, rcond=None)[0].T    # solve least squares for [A; C]
-    A = sol[n-1, n-1]                           # extract A
+    A = sol[0:n, 0:n]                           # extract A
 
     return A
 
@@ -213,41 +214,46 @@ def minfn(data, model, theTemp, doHyst):
     y = -np.diff(verr)
     u = np.diff(etaik)
     A = SISOsubid(y, u, numpoles)
-    # eigA = A
 
-    RCfact = A
-    RC = -1/np.log(A)
+    # Modify results to ensure real, preferably distinct, between 0 and 1
+
+    eigA = np.linalg.eigvals(A)
+    eigAr = eigA + 0.001 * np.random.normal(len(eigA))
+    eigA[eigA != np.conj(eigA)] = abs(eigAr[eigA != np.conj(eigA)]) # Make sure real
+    eigA[eigA<0] = abs(eigA[eigA<0])    # Make sure in range 
+    eigA[eigA>1] = 1 / eigA[eigA>1]
+    RCfact = np.sort(eigA)
+    RCfact = RCfact[-numpoles:]
+    RC = -1 / np.log(RCfact)
 
     # Simulate the R-C filters to find R-C currents
-    # assume no control-system toolbox
-    vrcRaw = np.zeros(len(etaik))
-    for vrcK in range(len(etaik)-1):
-        vrcRaw[vrcK+1] = RCfact*vrcRaw[vrcK] + (1-RCfact)*etaik[vrcK]
+    stsp = dlti(np.diag(RCfact), np.vstack(1-RCfact), np.eye(numpoles), np.zeros((numpoles, 1))) 
+    [tout, vrcRaw, xout] = dlsim(stsp, etaik)
 
     # Third modeling step: Hysteresis parameters
     if doHyst:
-        H = np.vstack((hh, sik, -etaik, -vrcRaw)).T
+        H = np.column_stack((hh, sik, -etaik, -vrcRaw))
         W = nnls(H, verr)
         M = W[0][0]
         M0 = W[0][1]
         R0 = W[0][2]
-        Rfact = W[0][3]
+        Rfact = W[0][3:].T
     else:
-        H = np.vstack((-etaik, -vrcRaw)).T
+        H = np.column_stack((-etaik, -vrcRaw))
         W = np.linalg.lstsq(H,verr, rcond=None)[0]
         M = 0
         M0 = 0
         R0 = W[0]
-        Rfact = W[1]
+        Rfact = W[1:].T
 
     idx, = np.where(np.array(model.temps) == data[ind].temp)[0]
     model.R0Param[idx] = R0
     model.M0Param[idx] = M0
     model.MParam[idx] = M
-    model.RCParam[idx] = RC
-    model.RParam[idx] = Rfact
+    model.RCParam[idx] = RC.T
+    model.RParam[idx] = Rfact.T
 
-    vest2 = vest1 + M*hh + M0*sik - R0*etaik - vrcRaw*Rfact
+    vest2 = vest1 + M*hh + M0*sik - R0*etaik - vrcRaw @ Rfact.T
     verr = vk - vest2
 
     # plot voltages
