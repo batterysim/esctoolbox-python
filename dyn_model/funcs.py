@@ -8,7 +8,7 @@ Functions used by the dyn_model
 import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import fminbound, nnls
+from scipy.optimize import fminbound, nnls, minimize_scalar
 from scipy.signal import dlsim, dlti
 from models import ModelDyn
 
@@ -367,6 +367,13 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     - model: A modified model, which now contains the dynamic fields filled in.
     """
 
+    # used by minimize_scalar later on
+    options = {
+        'xatol': 1e-08, 
+        'maxiter': 1e5, 
+        'disp': 0
+    }
+
     # Step 1: Compute capacity and coulombic efficiency for every test
     # ------------------------------------------------------------------
 
@@ -441,7 +448,7 @@ def processDynamic(data, modelocv, numpoles, doHyst):
         print('Processing temperature', temp, 'C')
 
         if doHyst:
-            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, temp, doHyst), xtol=1e-8, maxfun=1e5))
+            g = abs(minimize_scalar(optfn, bounds=(1, 250), args=(data, modeldyn, temp, doHyst), method='bounded', options=options).x)
             print('g =', g)
 
         else:
