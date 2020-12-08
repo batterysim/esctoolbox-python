@@ -218,8 +218,9 @@ def minfn(data, model, theTemp, doHyst):
     # Modify results to ensure real, preferably distinct, between 0 and 1
 
     eigA = np.linalg.eigvals(A)
-    eigAr = eigA + 0.001 * np.random.normal(len(eigA))
+    eigAr = eigA + 0.001 * np.random.normal(loc=0.0, scale=1.0, size=eigA.shape)
     eigA[eigA != np.conj(eigA)] = abs(eigAr[eigA != np.conj(eigA)]) # Make sure real
+    eigA = np.real(eigA)                                            # Make sure real
     eigA[eigA<0] = abs(eigA[eigA<0])    # Make sure in range 
     eigA[eigA>1] = 1 / eigA[eigA>1]
     RCfact = np.sort(eigA)
@@ -421,7 +422,7 @@ def processDynamic(data, modelocv, numpoles, doHyst):
         print('Processing temperature', temp, 'C')
 
         if doHyst:
-            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, temp, doHyst)))
+            g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, temp, doHyst), xtol=1e-8, maxfun=1e5))
             print('g =', g)
 
         else:
