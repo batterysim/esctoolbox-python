@@ -227,6 +227,25 @@ def minfn(data, model, theTemp, doHyst):
     RCfact = RCfact[-numpoles:]
     RC = -1 / np.log(RCfact)
 
+    # Compute RC time constants as Plett's Matlab ESCtoolbox 
+    # nup = numpoles
+    # while 1:
+    #     A = SISOsubid(y, u, nup)
+
+    #     # Modify results to ensure real, preferably distinct, between 0 and 1
+    #     eigA = np.linalg.eigvals(A)
+    #     eigA = np.real(eigA[eigA == np.conj(eigA)])   # Make sure real
+    #     eigA = eigA[(eigA>0) & (eigA<1)]    # Make sure in range 
+    #     okpoles = len(eigA)
+    #     nup = nup + 1
+    #     if okpoles >= numpoles:
+    #         break
+    #     # print(nup)
+
+    # RCfact = np.sort(eigA)
+    # RCfact = RCfact[-numpoles:]
+    # RC = -1 / np.log(RCfact)
+
     # Simulate the R-C filters to find R-C currents
     stsp = dlti(np.diag(RCfact), np.vstack(1-RCfact), np.eye(numpoles), np.zeros((numpoles, 1))) 
     [tout, vrcRaw, xout] = dlsim(stsp, etaik)
