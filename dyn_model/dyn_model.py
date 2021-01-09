@@ -3,7 +3,7 @@ Dyn model
 """
 
 import numpy as np
-import pickle
+import json
 
 from funcs import processDynamic
 from models import DataModel, ModelOcv
@@ -18,7 +18,7 @@ mags = [10, 10, 30, 45, 45, 50, 50, 50]     # A123
 doHyst = 1          # 1 "find M, M0 and G params" or 0 "make hys params 0" 
 
 # read model OCV file, previously computed by runProcessOCV
-modelocv = ModelOcv.load(Path(f'./ocv_model/modelocv.pickle'))
+modelocv = ModelOcv.load(Path(f'./modelocv.json'))
 
 # initialize array to store battery cell data
 data = np.zeros(len(mags), dtype=object)
@@ -45,8 +45,12 @@ for idx, temp in enumerate(temps):
 
 modeldyn = processDynamic(data, modelocv, numpoles, doHyst)
 
-# store ocv and dyn results in model object then save to disk
-if doHyst:
-    pickle.dump(modeldyn, open('modeldyn.pickle', 'wb'))
-else:
-    pickle.dump(modeldyn, open('modeldynWithoutHyst.pickle', 'wb'))
+# convert ocv and dyn results model object to dict, then save in JSON to disk 
+modeldyn = {k:v.tolist() for k,v in modeldyn.__dict__.items() if isinstance(v, np.ndarray)}
+if True:
+    if doHyst:
+        with open('modeldyn.json', 'w') as json_file:
+            json.dump(modeldyn, json_file, indent=4)
+    else:
+        with open('modeldyn-no-hys.json', 'w') as json_file:
+            json.dump(modeldyn,json_file, indent=4)

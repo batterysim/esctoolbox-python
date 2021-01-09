@@ -4,7 +4,7 @@ Python version of the runProcessOCV Matlab file for A123_OCV battery cell.
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
+import json
 
 from models import BatteryData, FileData, ModelOcv
 from funcs import OCVfromSOCtemp
@@ -20,7 +20,7 @@ temps = np.array([-25, -15, -5, 5, 15, 25, 35, 45])
 minV = 2.00     # minimum cell voltage, used for plotting results
 maxV = 3.75     # maximum cell voltage, used for plotting results
 
-SOC = np.arange(0, 1+0.005, 0.005)  # range for state of charge
+SOC = np.arange(0, 1+0.005, 0.005).round(decimals=3)  # range for state of charge
 
 # initialize variables to store calculations
 eta = np.zeros(len(temps))  # coulombic efficiency
@@ -213,7 +213,7 @@ H = np.ones([numtempskept, 2])
 H[:, 1] = postemps
 
 for k in range(len(SOC)):
-    X = np.linalg.lstsq(H, Vraw[:, k])
+    X = np.linalg.lstsq(H, Vraw[:, k], rcond=None)
     OCV0[k] = X[0][0]
     OCVrel[k] = X[0][1]
 
@@ -224,7 +224,7 @@ modelocv = ModelOcv(OCV0, OCVrel, SOC, 0, 0, 0, 0, 0)
 # ------------------------------------------------------------------------------
 
 z = np.arange(-0.1, 1.1, 0.01)     # test soc vector
-v = np.arange(minV-0.01, maxV+0.02, 0.01)
+v = np.arange(minV-0.01, maxV+0.02, 0.01).round(decimals=2)
 socs = np.zeros((len(temps), len(v)))
 
 for k, _ in enumerate(temps):
@@ -238,13 +238,13 @@ H = np.ones([len(temps), 2])
 H[:, 1] = temps
 
 for k in range(len(v)):
-    X = np.linalg.lstsq(H, socs[:, k])  # fit SOC(v,T) = 1*SOC0(v) + T*SOCrel(v)
+    X = np.linalg.lstsq(H, socs[:, k], rcond=None)  # fit SOC(v,T) = 1*SOC0(v) + T*SOCrel(v)
     SOC0[k] = X[0][0]
     SOCrel[k] = X[0][1]
 
-# store ocv results in model object then save to disk
+# store ocv results in model object
+# ------------------------------------------------------------------------------
 modelocv = ModelOcv(OCV0, OCVrel, SOC, v, SOC0, SOCrel, eta, Q)
-pickle.dump(modelocv, open('modelocv.pickle', 'wb'))
 
 # Plot Results
 # ------------------------------------------------------------------------------
@@ -268,4 +268,12 @@ for k, _ in enumerate(temps):
     plt.ylabel('OCV (V)')
     plt.legend(numpoints=1, loc='lower right')
     plt.grid()
+
+
+# convert model object to dict, then save in JSON to disk
+# ------------------------------------------------------------------------------
+if True:
+    modelocv = {k:v.tolist() for k,v in modelocv.__dict__.items() if isinstance(v, np.ndarray)}
+    with open('modelocv.json', 'w') as json_file:
+        json.dump(modelocv, json_file, indent=4)
 
