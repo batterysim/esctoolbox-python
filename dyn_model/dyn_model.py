@@ -46,7 +46,7 @@ for idx, temp in enumerate(temps):
 modeldyn = processDynamic(data, modelocv, numpoles, doHyst)
 
 # convert ocv and dyn results model object to dict, then save in JSON to disk 
-modeldyn = {k:v.tolist() for k,v in modeldyn.__dict__.items() if isinstance(v, np.ndarray)}
+modeldyn = {k:v.tolist() if isinstance(v, np.ndarray) else v for k,v in modeldyn.__dict__.items()}
 if True:
     if doHyst:
         with open('modeldyn.json', 'w') as json_file:
