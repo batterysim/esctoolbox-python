@@ -16,7 +16,7 @@ mag = magtemps[0]
 # plot data from the csv files
 
 plt.ion()
-plt.close('
+plt.close('all')
 
 # individual plots for each script
 
