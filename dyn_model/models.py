@@ -5,8 +5,9 @@ Class objects for the dyn_model calculations
 # Modules
 # ------------------------------------------------------------------------------
 
-import pickle
+import json
 import pandas as pd
+import numpy as np
 
 # Class Objects
 # ------------------------------------------------------------------------------
@@ -59,23 +60,23 @@ class ModelOcv:
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, OCV0, OCVrel, SOC, OCV, SOC0, SOCrel, OCVeta, OCVQ):
-        self.OCV0 = OCV0
-        self.OCVrel = OCVrel
-        self.SOC = SOC
-        self.OCV = OCV
-        self.SOC0 = SOC0
-        self.SOCrel = SOCrel
-        self.OCVeta = OCVeta
-        self.OCVQ = OCVQ
+        self.OCV0 = np.array(OCV0)
+        self.OCVrel = np.array(OCVrel)
+        self.SOC = np.array(SOC)
+        self.OCV = np.array(OCV)
+        self.SOC0 = np.array(SOC0)
+        self.SOCrel = np.array(SOCrel)
+        self.OCVeta = np.array(OCVeta)
+        self.OCVQ = np.array(OCVQ)
 
     @classmethod
     def load(cls, pfile):
         """
-        Load attributes from pickle file where pfile is string representing
-        path to the pickle file.
+        Load attributes from json file where pfile is string representing
+        path to the json file.
         """
-        ocv = pickle.load(open(pfile, 'rb'))
-        return cls(ocv.OCV0, ocv.OCVrel, ocv.SOC, ocv.OCV, ocv.SOC0, ocv.SOCrel, ocv.OCVeta, ocv.OCVQ)
+        ocv = json.load(open(pfile, 'r'))
+        return cls(ocv['OCV0'], ocv['OCVrel'], ocv['SOC'], ocv['OCV'], ocv['SOC0'], ocv['SOCrel'], ocv['OCVeta'], ocv['OCVQ'])
 
 
 class ModelDyn:

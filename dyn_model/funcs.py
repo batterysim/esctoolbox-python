@@ -8,7 +8,8 @@ Functions used by the dyn_model
 import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import fminbound, nnls
+from scipy.optimize import fminbound, nnls, minimize_scalar
+from scipy.signal import dlsim, dlti
 from models import ModelDyn
 
 # Functions
@@ -75,7 +76,7 @@ def SISOsubid(y, u, n):
     toolbox on MATLAB CENTRAL file exchange, originally by Peter Van Overschee,
     Dec. 1995
     """
-
+    
     ny = len(y)
     i = 2*n
     twoi = 4*n
@@ -93,7 +94,7 @@ def SISOsubid(y, u, n):
 
     # Compute the R factor
     UY = np.concatenate((U, Y))     # combine U and Y into one array
-    q, r = np.linalg.qr(UY.T)       # QR decomposition
+    _, r = np.linalg.qr(UY.T)       # QR decomposition
     R = r.T                         # transpose of upper triangle
 
     # STEP 1: Calculate oblique and orthogonal projections
@@ -103,13 +104,13 @@ def SISOsubid(y, u, n):
     Rp = np.concatenate((R[:i], R[2*i:3*i]))    # past inputs and outputs
     Ru = R[i:twoi, :twoi]                       # future inputs
 
-    RfRu = np.linalg.lstsq(Ru.T, Rf[:, :twoi].T)[0].T
+    RfRu = np.linalg.lstsq(Ru.T, Rf[:, :twoi].T, rcond=None)[0].T
     RfRuRu = RfRu.dot(Ru)
     tm1 = Rf[:, :twoi] - RfRuRu
     tm2 = Rf[:, twoi:4*i]
     Rfp = np.concatenate((tm1, tm2), axis=1)    # perpendicular future outputs
 
-    RpRu = np.linalg.lstsq(Ru.T, Rp[:, :twoi].T)[0].T
+    RpRu = np.linalg.lstsq(Ru.T, Rp[:, :twoi].T, rcond=None)[0].T
     RpRuRu = RpRu.dot(Ru)
     tm3 = Rp[:, :twoi] - RpRuRu
     tm4 = Rp[:, twoi:4*i]
@@ -129,20 +130,20 @@ def SISOsubid(y, u, n):
         Ob = Rfp.dot(np.linalg.pinv(Rpp.T).T).dot(Rp)
     else:
         # oblique projection as (Rfp/Rpp) * Rp
-        Ob = (np.linalg.lstsq(Rpp.T, Rfp.T)[0].T).dot(Rp)
+        Ob = (np.linalg.lstsq(Rpp.T, Rfp.T, rcond=None)[0].T).dot(Rp)
 
     # STEP 2: Compute weighted oblique projection and its SVD
     #         Extra projection of Ob on Uf perpendicular
     # ------------------------------------------------------------------
 
-    ObRu = np.linalg.lstsq(Ru.T, Ob[:, :twoi].T)[0].T
+    ObRu = np.linalg.lstsq(Ru.T, Ob[:, :twoi].T, rcond=None)[0].T
     ObRuRu = ObRu.dot(Ru)
     tm5 = Ob[:, :twoi] - ObRuRu
     tm6 = Ob[:, twoi:4*i]
     WOW = np.concatenate((tm5, tm6), axis=1)
 
     U, S, _ = np.linalg.svd(WOW, full_matrices=False)
-    ss = np.diag(S)
+    ss = S       # In np.linalg.svd S is already the diagonal, generally ss = diag(S)
 
     # STEP 3: Partitioning U into U1 and U2 (the latter is not used)
     # ------------------------------------------------------------------
@@ -152,26 +153,27 @@ def SISOsubid(y, u, n):
     # STEP 4: Determine gam = Gamma(i) and gamm = Gamma(i-1)
     # ------------------------------------------------------------------
 
-    gam = U1 * np.diag(np.sqrt(ss[:n]))
-    gamm = gam[0, i-2]
-    gam_inv = np.linalg.pinv(gam)[0]            # pseudo inverse of gam
-    gamm2 = np.array([[gamm], [gamm]])
-    gamm_inv = np.linalg.pinv(gamm2)[0][0]*2    # pseudo inverse of gamm
+    gam = U1 @ np.diag(np.sqrt(ss[:n]))
+    gamm = gam[0:(i-1),:]
+    gam_inv = np.linalg.pinv(gam)               # pseudo inverse of gam
+    gamm_inv = np.linalg.pinv(gamm)             # pseudo inverse of gamm
 
     # STEP 5: Determine A matrix (also C, which is not used)
     # ------------------------------------------------------------------
 
-    tm7 = np.concatenate((gam_inv.dot(R[-i:, :-i]), np.zeros(n)))
+    tm7 = np.concatenate((gam_inv @ R[3*i:4*i, 0:3*i], np.zeros((n,1))), axis=1)
     tm8 = R[i:twoi, 0:3*i+1]
     Rhs = np.vstack((tm7, tm8))
-    Lhs = np.vstack((gamm_inv*R[-i+1, :-i+1], R[-i, :-i+1]))
-    sol = np.linalg.lstsq(Rhs.T, Lhs.T)[0].T    # solve least squares for [A; C]
-    A = sol[n-1, n-1]                           # extract A
+    tm9 = gamm_inv @ R[3*i+1:4*i, 0:3*i+1]
+    tm10 = R[3*i:3*i+1, 0:3*i+1]
+    Lhs = np.vstack((tm9, tm10))
+    sol = np.linalg.lstsq(Rhs.T, Lhs.T, rcond=None)[0].T    # solve least squares for [A; C]
+    A = sol[0:n, 0:n]                           # extract A
 
     return A
 
 
-def minfn(data, model, theTemp):
+def minfn(data, model, theTemp, doHyst):
     """
     Using an assumed value for gamma (already stored in the model), find optimum
     values for remaining cell parameters, and compute the RMS error between true
@@ -186,7 +188,7 @@ def minfn(data, model, theTemp):
     Q = abs(model.QParam[ind])
     eta = abs(model.etaParam[ind])
     RC = abs(model.RCParam[ind])
-    numpoles = 1
+    numpoles = len(RC)
 
     ik = data[ind].s1.current.copy()
     vk = data[ind].s1.voltage.copy()
@@ -212,33 +214,66 @@ def minfn(data, model, theTemp):
     y = -np.diff(verr)
     u = np.diff(etaik)
     A = SISOsubid(y, u, numpoles)
-    # eigA = A
 
-    RCfact = A
-    RC = -1/np.log(A)
+    # Modify results to ensure real, preferably distinct, between 0 and 1
+
+    eigA = np.linalg.eigvals(A)
+    eigAr = eigA + 0.001 * np.random.normal(loc=0.0, scale=1.0, size=eigA.shape)
+    eigA[eigA != np.conj(eigA)] = abs(eigAr[eigA != np.conj(eigA)]) # Make sure real
+    eigA = np.real(eigA)                                            # Make sure real
+    eigA[eigA<0] = abs(eigA[eigA<0])    # Make sure in range 
+    eigA[eigA>1] = 1 / eigA[eigA>1]
+    RCfact = np.sort(eigA)
+    RCfact = RCfact[-numpoles:]
+    RC = -1 / np.log(RCfact)
+
+    # Compute RC time constants as Plett's Matlab ESCtoolbox 
+    # nup = numpoles
+    # while 1:
+    #     A = SISOsubid(y, u, nup)
+
+    #     # Modify results to ensure real, preferably distinct, between 0 and 1
+    #     eigA = np.linalg.eigvals(A)
+    #     eigA = np.real(eigA[eigA == np.conj(eigA)])   # Make sure real
+    #     eigA = eigA[(eigA>0) & (eigA<1)]    # Make sure in range 
+    #     okpoles = len(eigA)
+    #     nup = nup + 1
+    #     if okpoles >= numpoles:
+    #         break
+    #     # print(nup)
+
+    # RCfact = np.sort(eigA)
+    # RCfact = RCfact[-numpoles:]
+    # RC = -1 / np.log(RCfact)
 
     # Simulate the R-C filters to find R-C currents
-    # assume no control-system toolbox
-    vrcRaw = np.zeros(len(etaik))
-    for vrcK in range(len(etaik)-1):
-        vrcRaw[vrcK+1] = RCfact*vrcRaw[vrcK] + (1-RCfact)*etaik[vrcK]
+    stsp = dlti(np.diag(RCfact), np.vstack(1-RCfact), np.eye(numpoles), np.zeros((numpoles, 1))) 
+    [tout, vrcRaw, xout] = dlsim(stsp, etaik)
 
     # Third modeling step: Hysteresis parameters
-    H = np.vstack((hh, sik, -etaik, -vrcRaw)).T
-    W = nnls(H, verr)
-    M = W[0][0]
-    M0 = W[0][1]
-    R0 = W[0][2]
-    Rfact = W[0][3]
+    if doHyst:
+        H = np.column_stack((hh, sik, -etaik, -vrcRaw))
+        W = nnls(H, verr)
+        M = W[0][0]
+        M0 = W[0][1]
+        R0 = W[0][2]
+        Rfact = W[0][3:].T
+    else:
+        H = np.column_stack((-etaik, -vrcRaw))
+        W = np.linalg.lstsq(H,verr, rcond=None)[0]
+        M = 0
+        M0 = 0
+        R0 = W[0]
+        Rfact = W[1:].T
 
     idx, = np.where(np.array(model.temps) == data[ind].temp)[0]
     model.R0Param[idx] = R0
     model.M0Param[idx] = M0
     model.MParam[idx] = M
-    model.RCParam[idx] = RC
-    model.RParam[idx] = Rfact
+    model.RCParam[idx] = RC.T
+    model.RParam[idx] = Rfact.T
 
-    vest2 = vest1 + M*hh + M0*sik - R0*etaik - vrcRaw*Rfact
+    vest2 = vest1 + M*hh + M0*sik - R0*etaik - vrcRaw @ Rfact.T
     verr = vk - vest2
 
     # plot voltages
@@ -250,7 +285,7 @@ def minfn(data, model, theTemp):
     plt.ylabel('Voltage (V)')
     plt.title(f'Voltage and estimates at T = {data[ind].temp} C')
     plt.legend(loc='best', numpoints=1)
-    plt.show()
+    #plt.show()
 
     # plot modeling errors
     plt.figure(2)
@@ -258,7 +293,7 @@ def minfn(data, model, theTemp):
     plt.xlabel('Time (min)')
     plt.ylabel('Error (V)')
     plt.title(f'Modeling error at T = {data[ind].temp} C')
-    plt.show()
+    #plt.show()
 
     # Compute RMS error only on data roughly in 5% to 95% SOC
     v1 = OCVfromSOCtemp(0.95, data[ind].temp, model)[0]
@@ -273,7 +308,7 @@ def minfn(data, model, theTemp):
     return cost, model
 
 
-def optfn(x, data, model, theTemp):
+def optfn(x, data, model, theTemp, doHyst):
     """
     This minfn works for the enhanced self-correcting cell model
     """
@@ -281,7 +316,7 @@ def optfn(x, data, model, theTemp):
     idx, = np.where(np.array(model.temps) == theTemp)
     model.GParam[idx] = abs(x)
 
-    cost, _ = minfn(data, model, theTemp)
+    cost, _ = minfn(data, model, theTemp, doHyst)
     return cost
 
 
@@ -331,6 +366,13 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     The output:
     - model: A modified model, which now contains the dynamic fields filled in.
     """
+
+    # used by minimize_scalar later on
+    options = {
+        'xatol': 1e-08, 
+        'maxiter': 1e5, 
+        'disp': 0
+    }
 
     # Step 1: Compute capacity and coulombic efficiency for every test
     # ------------------------------------------------------------------
@@ -394,18 +436,23 @@ def processDynamic(data, modelocv, numpoles, doHyst):
     modeldyn.M0Param = np.zeros(len(modeldyn.temps))  # M0 hysteresis parameter
     modeldyn.MParam = np.zeros(len(modeldyn.temps))   # M hysteresis parameter
     modeldyn.R0Param = np.zeros(len(modeldyn.temps))  # R0 ohmic resistance parameter
-    modeldyn.RCParam = np.zeros(len(modeldyn.temps))  # time constant
-    modeldyn.RParam = np.zeros(len(modeldyn.temps))   # Rk
+    modeldyn.RCParam = np.zeros((len(modeldyn.temps), numpoles))  # time constant
+    modeldyn.RParam = np.zeros((len(modeldyn.temps), numpoles))   # Rk
 
     modeldyn.SOC = modelocv.SOC        # copy SOC values from OCV model
     modeldyn.OCV0 = modelocv.OCV0      # copy OCV0 values from OCV model
     modeldyn.OCVrel = modelocv.OCVrel  # copy OCVrel values from OCV model
 
-    tempidx = 0
-    theTemp = modeldyn.temps[tempidx]
-    print('Processing temperature', theTemp, 'C')
+    for theTemp in range(len(modeldyn.temps)):
+        temp = modeldyn.temps[theTemp]
+        print('Processing temperature', temp, 'C')
 
-    g = abs(fminbound(optfn, 1, 250, args=(data, modeldyn, theTemp)))
-    print('g =', g)
+        if doHyst:
+            g = abs(minimize_scalar(optfn, bounds=(1, 250), args=(data, modeldyn, temp, doHyst), method='bounded', options=options).x)
+            print('g =', g)
 
-
+        else:
+            modeldyn.GParam[theTemp] = 0
+            theGParam = 0 
+            optfn(theGParam, data, modeldyn, temp, doHyst)
+    return modeldyn   
